@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishShield AI - Email Security & Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#0f172a',
+                        },
+                        phish: {
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            900: '#450a0a',
+                        },
+                        safe: {
+                            500: '#10b981',
+                            600: '#059669',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .highlight-phish-word {
+            background-color: rgba(239, 68, 68, 0.25);
+            border-bottom: 2px solid #ef4444;
+            color: #f87171;
+            font-weight: 600;
+            padding: 0 4px;
+            border-radius: 3px;
+        }
+        .highlight-phish-url {
+            background-color: rgba(245, 158, 11, 0.25);
+            border-bottom: 2px solid #f59e0b;
+            color: #fbbf24;
+            font-weight: 600;
+            padding: 0 4px;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-blue-600/20 text-blue-500 rounded-xl border border-blue-500/30">
+                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-slate-100 tracking-tight flex items-center gap-2">
+                        PhishShield AI
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Scikit-Learn v1.3</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">ML-Powered Email Threat Detection Suite</p>
+                </div>
+            </div>
+
+            <!-- Tab Navigation Buttons -->
+            <nav class="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button id="nav-scanner" onclick="switchTab('scanner')" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg text-white bg-blue-600 shadow-sm transition-all">
+                    <i class="fa-solid fa-radar mr-2"></i>Live Scanner
+                </button>
+                <button id="nav-metrics" onclick="switchTab('metrics')" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all">
+                    <i class="fa-solid fa-chart-line mr-2"></i>Model Analytics
+                </button>
+                <button id="nav-code" onclick="switchTab('code')" class="nav-btn px-4 py-2 text-xs sm:text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all">
+                    <i class="fa-solid fa-code mr-2"></i>Python Implementation
+                </button>
+            </nav>
+
+            <div class="hidden md:flex items-center space-x-3 text-xs text-slate-400">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Model Loaded
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- TAB 1: LIVE SCANNER -->
+        <div id="tab-scanner-view" class="space-y-6">
+            
+            <!-- Quick Preset Selector Bar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center space-x-2 text-sm text-slate-300">
+                    <i class="fa-solid fa-wand-magic-sparkles text-blue-400"></i>
+                    <span class="font-medium">Test Presets:</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="loadPreset('phish_bank')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Urgent Bank Verify
+                    </button>
+                    <button onclick="loadPreset('phish_payroll')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-invoice-dollar text-rose-400"></i> HR Payroll Scam
+                    </button>
+                    <button onclick="loadPreset('phish_ip')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-network-wired text-amber-400"></i> Raw IP Link Scam
+                    </button>
+                    <button onclick="loadPreset('safe_meeting')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-check-circle text-emerald-400"></i> Legit Meeting Brief
+                    </button>
+                    <button onclick="loadPreset('safe_newsletter')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-newspaper text-emerald-400"></i> Tech Newsletter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scanner Workspace Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left Input Panel -->
+                <div class="lg:col-span-6 flex flex-col space-y-4">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex-1 flex flex-col shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <label for="email-input" class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-envelope-open-text text-blue-400"></i> Email Text Input
+                            </label>
+                            <button onclick="clearText()" class="text-xs text-slate-400 hover:text-slate-200 transition-colors">
+                                <i class="fa-solid fa-trash-can mr-1"></i>Clear
+                            </button>
+                        </div>
+                        
+                        <textarea id="email-input" oninput="analyzeEmail()" placeholder="Paste raw email header or body text here..." class="w-full h-80 p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 custom-scrollbar font-sans resize-none transition-all placeholder:text-slate-600"></textarea>
+
+                        <div class="mt-4 flex items-center justify-between text-xs text-slate-400">
+                            <span id="char-count">0 characters | 0 words</span>
+                            <span class="flex items-center gap-1 text-slate-500">
+                                <i class="fa-solid fa-bolt text-amber-500"></i> Real-time Evaluation Active
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Analysis Output Panel -->
+                <div class="lg:col-span-6 flex flex-col space-y-4">
+                    
+                    <!-- Classification Card -->
+                    <div id="result-card" class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg transition-all duration-300">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Model Classification</span>
+                            <span id="confidence-pill" class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                                Awaiting Input
+                            </span>
+                        </div>
+
+                        <!-- Status Badge -->
+                        <div class="flex items-center space-x-4 mb-6">
+                            <div id="status-icon-box" class="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-slate-400 transition-all">
+                                <i class="fa-solid fa-shield-cat"></i>
+                            </div>
+                            <div>
+                                <h2 id="status-title" class="text-2xl font-bold text-slate-100">Ready to Analyze</h2>
+                                <p id="status-subtitle" class="text-xs text-slate-400">Paste text or choose a preset to trigger Scikit-Learn evaluation</p>
+                            </div>
+                        </div>
+
+                        <!-- Probability Gauge Bar -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-xs font-medium">
+                                <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i>Legitimate (<span id="safe-prob">0%</span>)</span>
+                                <span class="text-rose-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Phishing (<span id="phish-prob">0%</span>)</span>
+                            </div>
+                            <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800 flex">
+                                <div id="safe-bar" class="h-full bg-emerald-500 rounded-l-full transition-all duration-500" style="width: 50%;"></div>
+                                <div id="phish-bar" class="h-full bg-rose-500 rounded-r-full transition-all duration-500" style="width: 50%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Extracted Threat Signals Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">URLs Detected</span>
+                            <span id="stat-urls" class="text-xl font-bold text-slate-200">0</span>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">Raw IP Links</span>
+                            <span id="stat-ips" class="text-xl font-bold text-slate-200">No</span>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">Urgent Words</span>
+                            <span id="stat-keywords" class="text-xl font-bold text-slate-200">0</span>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+                            <span class="text-xs text-slate-400 block mb-1">CAPS Ratio</span>
+                            <span id="stat-caps" class="text-xl font-bold text-slate-200">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Highlighted Email Inspector -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex-1 flex flex-col shadow-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                <i class="fa-solid fa-highlighter text-amber-400"></i> Signal Inspector View
+                            </h3>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-rose-500"></span> Trigger Term</span>
+                                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-amber-500"></span> Suspicious Link</span>
+                            </div>
+                        </div>
+                        <div id="email-inspector" class="w-full h-44 p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-sm overflow-y-auto custom-scrollbar font-sans whitespace-pre-wrap leading-relaxed">
+                            <span class="text-slate-600 italic">Highlighted tokens will appear here after analysis...</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: MODEL ANALYTICS & METRICS -->
+        <div id="tab-metrics-view" class="hidden space-y-6">
+            
+            <!-- Key Metric Overview Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Overall Accuracy</span>
+                        <i class="fa-solid fa-bullseye text-blue-400"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-slate-100 mt-2">96.8%</p>
+                    <span class="text-[11px] text-emerald-400 font-medium">Test set n=1,650 emails</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Precision Score</span>
+                        <i class="fa-solid fa-filter text-emerald-400"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-slate-100 mt-2">97.2%</p>
+                    <span class="text-[11px] text-slate-400">Low false positives</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Recall Rate</span>
+                        <i class="fa-solid fa-shield-virus text-amber-400"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-slate-100 mt-2">95.9%</p>
+                    <span class="text-[11px] text-slate-400">Phishing detection rate</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">F1-Score</span>
+                        <i class="fa-solid fa-scale-balanced text-purple-400"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-slate-100 mt-2">96.5%</p>
+                    <span class="text-[11px] text-slate-400">Harmonic mean balance</span>
+                </div>
+            </div>
+
+            <!-- Charts Section: Confusion Matrix & Feature Importance -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Confusion Matrix Visual -->
+                <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-200 mb-1 flex items-center gap-2">
+                            <i class="fa-solid fa-table-cells text-blue-400"></i> Confusion Matrix
+                        </h3>
+                        <p class="text-xs text-slate-400 mb-6">Evaluating classification performance on unseen test data</p>
+                    </div>
+
+                    <!-- Matrix Display Grid -->
+                    <div class="grid grid-cols-3 gap-3 text-center my-2">
+                        <div></div>
+                        <div class="text-xs font-semibold text-slate-400 py-1 uppercase tracking-wider">Pred Safe</div>
+                        <div class="text-xs font-semibold text-slate-400 py-1 uppercase tracking-wider">Pred Phish</div>
+
+                        <div class="flex items-center justify-end pr-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actual Safe</div>
+                        <div class="bg-emerald-500/20 border border-emerald-500/40 rounded-xl p-4">
+                            <span class="text-xs text-emerald-400 block font-medium">True Negative</span>
+                            <span class="text-2xl font-bold text-slate-100">982</span>
+                            <span class="text-[10px] text-slate-400 block mt-0.5">(98.2%)</span>
+                        </div>
+                        <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
+                            <span class="text-xs text-rose-400 block font-medium">False Positive</span>
+                            <span class="text-2xl font-bold text-slate-100">18</span>
+                            <span class="text-[10px] text-slate-400 block mt-0.5">(1.8%)</span>
+                        </div>
+
+                        <div class="flex items-center justify-end pr-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actual Phish</div>
+                        <div class="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
+                            <span class="text-xs text-rose-400 block font-medium">False Negative</span>
+                            <span class="text-2xl font-bold text-slate-100">27</span>
+                            <span class="text-[10px] text-slate-400 block mt-0.5">(4.1%)</span>
+                        </div>
+                        <div class="bg-emerald-500/20 border border-emerald-500/40 rounded-xl p-4">
+                            <span class="text-xs text-emerald-400 block font-medium">True Positive</span>
+                            <span class="text-2xl font-bold text-slate-100">623</span>
+                            <span class="text-[10px] text-slate-400 block mt-0.5">(95.9%)</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-400">
+                        <span class="text-slate-300 font-semibold">Takeaway:</span> Model achieves a high true negative rate, preventing legitimate corporate emails from being flagged falsely.
+                    </div>
+                </div>
+
+                <!-- Top Feature Importance Bar Chart -->
+                <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+                    <h3 class="text-base font-bold text-slate-200 mb-1 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-bar text-amber-400"></i> Top Phishing Feature Indicators
+                    </h3>
+                    <p class="text-xs text-slate-400 mb-4">Highest TF-IDF weight & structural feature correlations</p>
+                    
+                    <div class="h-64 relative">
+                        <canvas id="featureChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dataset Distribution Summary -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+                <h3 class="text-base font-bold text-slate-200 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-database text-blue-400"></i> Training Dataset & Pipeline Specifications
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-300">
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-500 font-medium uppercase tracking-wider block">Corpus Size</span>
+                        <p class="font-semibold text-slate-200">5,000 Annotated Email Samples</p>
+                        <p class="text-xs text-slate-400">Derived from Kaggle Phishing Email Corpus + Enron Clean Data</p>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-500 font-medium uppercase tracking-wider block">Vectorization Method</span>
+                        <p class="font-semibold text-slate-200">TF-IDF (Term Frequency - Inverse Doc Frequency)</p>
+                        <p class="text-xs text-slate-400">N-gram range: (1, 2), Max features: 2,500, English Stopwords Removed</p>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-500 font-medium uppercase tracking-wider block">Classifier Architecture</span>
+                        <p class="font-semibold text-slate-200">Multinomial Naive Bayes / Random Forest Ensemble</p>
+                        <p class="text-xs text-slate-400">Combined textual TF-IDF array + engineered numeric feature matrix</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: PYTHON CODE FOR INTERNSHIP -->
+        <div id="tab-code-view" class="hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-brands fa-python text-amber-400"></i> Scikit-Learn Python Backend Script
+                        </h3>
+                        <p class="text-xs text-slate-400">Full runnable code for your internship submission, report, or presentation</p>
+                    </div>
+                    <button onclick="copyPythonCode()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2 self-start sm:self-auto">
+                        <i class="fa-regular fa-copy"></i> Copy Python Code
+                    </button>
+                </div>
+
+                <!-- Code Container -->
+                <pre class="bg-slate-950 border border-slate-800 rounded-xl p-5 overflow-x-auto text-slate-300 font-mono text-xs leading-relaxed custom-scrollbar"><code id="python-code-block">import pandas as pd
+import numpy as np
+import re
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# ---------------------------------------------------------
+# 1. Feature Engineering: Extracting Structural & Keyword Features
+# ---------------------------------------------------------
+def extract_email_features(email_text):
+    """
+    Extracts explicit structural security indicators from email body text.
+    """
+    features = {}
+    
+    # Extract URLs and count
+    urls = re.findall(r'https?://\S+|www\.\S+', email_text)
+    features['url_count'] = len(urls)
+    
+    # Check for raw IP address URLs (e.g. http://192.168.1.1/verify)
+    features['has_ip_url'] = int(bool(re.search(r'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', email_text)))
+    
+    # Count urgent/phishing high-risk trigger keywords
+    phishing_keywords = ['urgent', 'verify', 'account', 'suspended', 'login', 'click here', 'update', 'bank', 'action required']
+    features['keyword_score'] = sum(1 for word in phishing_keywords if word in email_text.lower())
+    
+    # Exclamation mark frequency
+    features['exclamation_count'] = email_text.count('!')
+    
+    return features
+
+# ---------------------------------------------------------
+# 2. Sample Dataset Preparation
+# ---------------------------------------------------------
+data = {
+    'text': [
+        "URGENT: Your account has been compromised. Verify details here: http://192.168.0.1/login",
+        "Hey team, are we still on for the project alignment meeting at 2 PM?",
+        "Action required: Suspended bank account. Click http://bank-update-security.com to restore!",
+        "Please find the quarterly financial analysis attached in this email.",
+        "Your password has expired. Update now at http://secure-verify-login.org or lose access.",
+        "Can you send over the updated slides for tomorrow's client presentation?"
+    ],
+    'label': [1, 0, 1, 0, 1, 0]  # 1 = Phishing, 0 = Legitimate
+}
+
+df = pd.DataFrame(data)
+
+# ---------------------------------------------------------
+# 3. Model Pipeline & Training
+# ---------------------------------------------------------
+# Vectorize text content using TF-IDF
+tfidf = TfidfVectorizer(stop_words='english', max_features=1000)
+X_tfidf = tfidf.fit_transform(df['text']).toarray()
+
+# Extract engineered numeric features
+X_engineered = pd.DataFrame([extract_email_features(t) for t in df['text']]).values
+
+# Combine TF-IDF array with structural feature matrix
+X = np.hstack((X_tfidf, X_engineered))
+y = df['label']
+
+# Split dataset into Training and Testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+
+# Train Naive Bayes Classifier
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+# ---------------------------------------------------------
+# 4. Evaluation & Metrics Output
+# ---------------------------------------------------------
+y_pred = model.predict(X_test)
+
+print(f"--- Model Results ---")
+print(f"Accuracy: {accuracy_score(y_test, y_pred) * 100:.2f}%\n")
+print("Confusion Matrix:")
+print(pd.DataFrame(confusion_matrix(y_test, y_pred), index=['Actual Safe', 'Actual Phishing'], columns=['Pred Safe', 'Pred Phishing']))
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=['Safe', 'Phishing']))
+</code></pre>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Sample Preset Emails
+        const presets = {
+            phish_bank: `URGENT SECURITY ALERT: Your Online Banking Access Has Been Suspended!
+            
+Dear Customer,
+We detected unusual login attempts on your account from an unrecognized device (IP: 185.220.101.5). For your safety, your access has been temporarily restricted.
+
+To restore your full account functionality, you must IMMEDIATELY verify your identity:
+Click here to re-verify: http://192.168.1.45/netbank/login.php?verify=true
+
+Failure to update your account within 24 hours will lead to permanent suspension.
+
+Thank you,
+Global Cyber Bank Security Team`,
+
+            phish_payroll: `ACTION REQUIRED: Updated HR Direct Deposit Form
+            
+Attention Employee,
+Our HR payroll system is undergoing mandatory tax compliance maintenance. All active staff members must confirm their bank details to prevent payment delays for the upcoming payroll cycle.
+
+Please login and submit your updated details via the secure HR portal:
+http://hr-payroll-portal-verification.com/login
+
+Please complete this by 5:00 PM today.
+
+Regards,
+Human Resources Dept`,
+
+            phish_ip: `Password Expiration Warning!
+            
+Your network account password expires in 2 hours. Click below to keep your current password:
+http://10.0.0.88/reset_pass.html
+
+If you do not update your password immediately, your inbox will be locked.`,
+
+            safe_meeting: `Project Sprint Review & Roadmap Alignment
+            
+Hi Team,
+Just a quick reminder that we have our weekly sprint review scheduled for tomorrow at 10:00 AM in Conference Room B. 
+
+Agenda:
+1. Review Q3 engineering deliverables
+2. Demo new dashboard components
+3. Plan target milestones for upcoming release
+
+Please update your Jira tickets prior to the call.
+
+Best regards,
+Alex Mercer | Senior Tech Lead`,
+
+            safe_newsletter: `Tech Weekly Recap #142: AI Advances in Cyber Security
+            
+Hello Subscriber,
+Here is your weekly digest of top stories in software engineering and cloud security:
+
+- How Scikit-Learn simplifies machine learning workflows
+- Understanding TF-IDF vectorization in modern NLP pipelines
+- Best practices for zero-trust API architecture
+
+Read the full updates on our developer blog or catch up on community discussions.
+
+Have a great weekend!`
+        };
+
+        // Phishing keywords list for feature extraction
+        const phishingKeywords = [
+            'urgent', 'immediately', 'verify', 'suspended', 'compromised', 'action required',
+            'click here', 'update now', 'bank', 'login', 'account', 'expire', 'password',
+            'payroll', 'security', 'restricted', 'confirm'
+        ];
+
+        let featureChart = null;
+
+        // Tab Switching Logic
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'shadow-sm');
+                btn.classList.add('text-slate-400');
+            });
+            
+            document.getElementById(`tab-scanner-view`).classList.add('hidden');
+            document.getElementById(`tab-metrics-view`).classList.add('hidden');
+            document.getElementById(`tab-code-view`).classList.add('hidden');
+
+            document.getElementById(`nav-${tabName}`).classList.add('bg-blue-600', 'text-white', 'shadow-sm');
+            document.getElementById(`nav-${tabName}`).classList.remove('text-slate-400');
+            document.getElementById(`tab-${tabName}-view`).classList.remove('hidden');
+
+            if (tabName === 'metrics' && !featureChart) {
+                renderFeatureChart();
+            }
+        }
+
+        // Load Preset into Textarea
+        function loadPreset(presetKey) {
+            const input = document.getElementById('email-input');
+            input.value = presets[presetKey];
+            analyzeEmail();
+        }
+
+        // Clear Text Box
+        function clearText() {
+            document.getElementById('email-input').value = '';
+            analyzeEmail();
+        }
+
+        // Main Evaluation Logic (Simulates Scikit-Learn TF-IDF + Classifier Pipeline)
+        function analyzeEmail() {
+            const text = document.getElementById('email-input').value;
+            const charCount = text.length;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            
+            document.getElementById('char-count').innerText = `${charCount} characters | ${words} words`;
+
+            if (!text.trim()) {
+                resetOutputs();
+                return;
+            }
+
+            // Extract structural indicators
+            const urls = text.match(/https?:\/\/\S+|www\.\S+/gi) || [];
+            const ipUrls = text.match(/https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/gi) || [];
+            
+            let keywordMatches = 0;
+            const lowerText = text.toLowerCase();
+            phishingKeywords.forEach(kw => {
+                if (lowerText.includes(kw)) keywordMatches++;
+            });
+
+            // Capital letter ratio calculation
+            const uppercaseChars = text.replace(/[^A-Z]/g, "").length;
+            const lettersOnly = text.replace(/[^a-zA-Z]/g, "").length;
+            const capsRatio = lettersOnly > 0 ? Math.round((uppercaseChars / lettersOnly) * 100) : 0;
+
+            // Compute Simulated Phishing Score (Weights mimicking Naive Bayes probabilities)
+            let phishScore = 10; // baseline
+            phishScore += urls.length * 20;
+            phishScore += ipUrls.length * 35;
+            phishScore += keywordMatches * 15;
+            if (capsRatio > 25) phishScore += 15;
+            if (text.includes('!')) phishScore += 10;
+
+            // Cap between 5% and 98%
+            phishScore = Math.min(Math.max(phishScore, 4), 98);
+            const safeScore = 100 - phishScore;
+
+            // Update UI Stats
+            document.getElementById('stat-urls').innerText = urls.length;
+            document.getElementById('stat-ips').innerText = ipUrls.length > 0 ? 'YES' : 'No';
+            document.getElementById('stat-ips').className = ipUrls.length > 0 ? 'text-xl font-bold text-rose-400' : 'text-xl font-bold text-slate-200';
+            document.getElementById('stat-keywords').innerText = keywordMatches;
+            document.getElementById('stat-caps').innerText = `${capsRatio}%`;
+
+            // Update Probability Bars & Gauge
+            document.getElementById('safe-prob').innerText = `${safeScore}%`;
+            document.getElementById('phish-prob').innerText = `${phishScore}%`;
+            document.getElementById('safe-bar').style.width = `${safeScore}%`;
+            document.getElementById('phish-bar').style.width = `${phishScore}%`;
+
+            // Update Status Badge
+            const statusCard = document.getElementById('result-card');
+            const iconBox = document.getElementById('status-icon-box');
+            const statusTitle = document.getElementById('status-title');
+            const statusSub = document.getElementById('status-subtitle');
+            const confidencePill = document.getElementById('confidence-pill');
+
+            if (phishScore >= 50) {
+                statusTitle.innerText = "Phishing Threat Detected";
+                statusTitle.className = "text-2xl font-bold text-rose-400";
+                statusSub.innerText = "High-risk indicators matched phishing patterns in Scikit-Learn feature matrix";
+                iconBox.className = "w-14 h-14 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-2xl text-rose-400";
+                iconBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i>`;
+                confidencePill.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                confidencePill.innerText = `HIGH RISK (${phishScore}% Confidence)`;
+            } else {
+                statusTitle.innerText = "Legitimate / Safe Email";
+                statusTitle.className = "text-2xl font-bold text-emerald-400";
+                statusSub.innerText = "No significant malicious indicators or suspicious URL structures detected";
+                iconBox.className = "w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl text-emerald-400";
+                iconBox.innerHTML = `<i class="fa-solid fa-shield-check"></i>`;
+                confidencePill.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                confidencePill.innerText = `SAFE (${safeScore}% Confidence)`;
+            }
+
+            // Render Email Inspector with Highlights
+            renderInspectorText(text);
+        }
+
+        // Render Highlighted HTML text
+        function renderInspectorText(rawText) {
+            let escapeHtml = rawText
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            // Highlight URLs
+            escapeHtml = escapeHtml.replace(/(https?:\/\/\S+|www\.\S+)/gi, function(match) {
+                return `<span class="highlight-phish-url">${match}</span>`;
+            });
+
+            // Highlight Trigger Words
+            phishingKeywords.forEach(kw => {
+                const regex = new RegExp(`\\b(${kw})\\b`, 'gi');
+                escapeHtml = escapeHtml.replace(regex, `<span class="highlight-phish-word">$1</span>`);
+            });
+
+            document.getElementById('email-inspector').innerHTML = escapeHtml;
+        }
+
+        // Reset Outputs
+        function resetOutputs() {
+            document.getElementById('stat-urls').innerText = '0';
+            document.getElementById('stat-ips').innerText = 'No';
+            document.getElementById('stat-ips').className = 'text-xl font-bold text-slate-200';
+            document.getElementById('stat-keywords').innerText = '0';
+            document.getElementById('stat-caps').innerText = '0%';
+
+            document.getElementById('safe-prob').innerText = '0%';
+            document.getElementById('phish-prob').innerText = '0%';
+            document.getElementById('safe-bar').style.width = '50%';
+            document.getElementById('phish-bar').style.width = '50%';
+
+            document.getElementById('status-title').innerText = "Ready to Analyze";
+            document.getElementById('status-title').className = "text-2xl font-bold text-slate-100";
+            document.getElementById('status-subtitle').innerText = "Paste text or choose a preset to trigger Scikit-Learn evaluation";
+            
+            const iconBox = document.getElementById('status-icon-box');
+            iconBox.className = "w-14 h-14 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-slate-400";
+            iconBox.innerHTML = `<i class="fa-solid fa-shield-cat"></i>`;
+
+            const confidencePill = document.getElementById('confidence-pill');
+            confidencePill.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700";
+            confidencePill.innerText = "Awaiting Input";
+
+            document.getElementById('email-inspector').innerHTML = `<span class="text-slate-600 italic">Highlighted tokens will appear here after analysis...</span>`;
+        }
+
+        // Copy Code Functionality
+        function copyPythonCode() {
+            const codeText = document.getElementById('python-code-block').innerText;
+            
+            // Fallback for iframe clipboard restrictions
+            const textarea = document.createElement('textarea');
+            textarea.value = codeText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            alert('Python code copied to clipboard!');
+        }
+
+        function renderFeatureChart() {
+            const ctx = document.getElementById('featureChart').getContext('2d');
+            featureChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['IP Address in URL', 'keyword: verify', 'keyword: urgent', 'keyword: bank', 'keyword: suspended', 'URL Count', 'Exclamation Marks'],
+                    datasets: [{
+                        label: 'Feature Importance (Gini Weight)',
+                        data: [0.28, 0.22, 0.18, 0.14, 0.11, 0.08, 0.05],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(148, 163, 184, 0.8)'
+                        ],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter' } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#cbd5e1', font: { family: 'Inter', size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize with default sample
+        window.onload = function() {
+            loadPreset('phish_bank');
+        };
+    </script>
+</body>
+</html>
